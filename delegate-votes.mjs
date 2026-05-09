@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createPublicClient, createWalletClient, http, isAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 

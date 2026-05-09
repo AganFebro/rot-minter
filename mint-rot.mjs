@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { privateKeyToAccount } from 'viem/accounts';
 
 const DEFAULT_MCP_URL = 'https://www.brainrot.dog/api/mcp';

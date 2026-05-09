@@ -49,7 +49,7 @@ Sebelum mint, wallet harus sudah delegated ke:
 Jalankan:
 
 ```bash
-export $(grep -v '^#' .env | xargs) && npm run delegate
+npm run delegate
 ```
 
 Kalau sukses, output akan tampil kurang lebih begini:
@@ -79,7 +79,7 @@ Kalau `MINT_ADDRESS` ada, script akan pakai itu.
 Setelah wallet delegated, jalankan:
 
 ```bash
-export $(grep -v '^#' .env | xargs) && npm run mint
+npm run mint
 ```
 
 Default:
@@ -90,7 +90,7 @@ Default:
 Kalau mau batch mint:
 
 ```bash
-export $(grep -v '^#' .env | xargs) && MINT_COUNT=5 npm run mint
+MINT_COUNT=5 npm run mint
 ```
 
 Maksimal `MINT_COUNT` adalah **10**.
@@ -120,13 +120,13 @@ Script sudah dibuat untuk retry otomatis:
 Kalau mau retry cuma 5 kali:
 
 ```bash
-export $(grep -v '^#' .env | xargs) && MAX_RETRIES=5 npm run mint
+MAX_RETRIES=5 npm run mint
 ```
 
 Kalau mau delay 30 detik:
 
 ```bash
-export $(grep -v '^#' .env | xargs) && RETRY_DELAY_MS=30000 npm run mint
+RETRY_DELAY_MS=30000 npm run mint
 ```
 
 ## 8. Script yang tersedia
@@ -160,4 +160,3 @@ Atau:
 2. `mint-rot.mjs` butuh server MCP `brainrot.dog` dalam keadaan normal
 3. Kalau tool mint dari MCP error, script akan fail atau retry sesuai config
 4. Jangan commit file `.env` karena isinya private key
-
