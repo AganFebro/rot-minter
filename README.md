@@ -108,9 +108,9 @@ Script ini:
 
 Jadi gas mint bukan dibayar dari script ini. Mint dieksekusi oleh relayer milik server `brainrot.dog`.
 
-## 7. Kalau error `RELAYER_SERVER_URL not configured`
+## 7. Kalau server MCP error
 
-Itu error dari server `brainrot.dog`, bukan dari wallet kamu.
+Kalau muncul `RELAYER_SERVER_URL not configured` atau status `502/503/504`, itu error dari server `brainrot.dog`, bukan dari wallet kamu.
 
 Script sudah dibuat untuk retry otomatis:
 
@@ -158,5 +158,5 @@ Atau:
 
 1. `delegate-votes.mjs` butuh RPC yang sudah support **EIP-7702 / Pectra**
 2. `mint-rot.mjs` butuh server MCP `brainrot.dog` dalam keadaan normal
-3. Kalau tool mint dari MCP error, script akan fail atau retry sesuai config
+3. Kalau tool mint dari MCP error atau server timeout, script akan fail atau retry sesuai config
 4. Jangan commit file `.env` karena isinya private key

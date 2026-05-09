@@ -3,6 +3,11 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 const DEFAULT_MCP_URL = 'https://www.brainrot.dog/api/mcp';
 const RELAYER_NOT_CONFIGURED_ERROR = 'error: RELAYER_SERVER_URL not configured';
+const RETRYABLE_STATUS_ERRORS = [
+  'MCP request failed with status 502',
+  'MCP request failed with status 503',
+  'MCP request failed with status 504',
+];
 
 function readRequiredEnv(name) {
   const value = process.env[name];
@@ -137,7 +142,13 @@ function parseWalletStatus(text) {
 }
 
 function shouldRetry(error) {
-  return error instanceof Error && error.message.includes(RELAYER_NOT_CONFIGURED_ERROR);
+  return (
+    error instanceof Error &&
+    (
+      error.message.includes(RELAYER_NOT_CONFIGURED_ERROR) ||
+      RETRYABLE_STATUS_ERRORS.some((message) => error.message.includes(message))
+    )
+  );
 }
 
 function sleep(ms) {
@@ -146,52 +157,17 @@ function sleep(ms) {
   });
 }
 
-async function main() {
-  const address = readMintAddress();
-  const count = readCount();
-  const retryDelayMs = readRetryDelayMs();
-  const maxRetries = readMaxRetries();
-
-  const walletStatus = unwrapToolResult(
-    await callMcp('tools/call', {
-      name: 'check_wallet',
-      arguments: { address },
-    }),
-  );
-
-  const supplyStatus = unwrapToolResult(
-    await callMcp('tools/call', {
-      name: 'get_supply',
-      arguments: {},
-    }),
-  );
-
-  const { delegated, slotsRemaining } = parseWalletStatus(walletStatus);
-
-  if (!delegated) {
-    throw new Error(
-      `Wallet ${address} not delegated yet.\n${walletStatus}`,
-    );
-  }
-
-  if (slotsRemaining !== null && count > slotsRemaining) {
-    throw new Error(
-      `Requested ${count} slot(s), but only ${slotsRemaining} slot(s) remain for ${address}.`,
-    );
-  }
-
-  let result;
+async function callToolWithRetry(name, args, retryDelayMs, maxRetries) {
   let attempt = 0;
 
   while (true) {
     try {
-      result = unwrapToolResult(
+      return unwrapToolResult(
         await callMcp('tools/call', {
-          name: count === 1 ? 'mint' : 'batch_mint',
-          arguments: count === 1 ? { address } : { address, count },
+          name,
+          arguments: args,
         }),
       );
-      break;
     } catch (error) {
       if (!shouldRetry(error)) {
         throw error;
@@ -208,6 +184,48 @@ async function main() {
       await sleep(retryDelayMs);
     }
   }
+}
+
+async function main() {
+  const address = readMintAddress();
+  const count = readCount();
+  const retryDelayMs = readRetryDelayMs();
+  const maxRetries = readMaxRetries();
+
+  const walletStatus = await callToolWithRetry(
+    'check_wallet',
+    { address },
+    retryDelayMs,
+    maxRetries,
+  );
+
+  const supplyStatus = await callToolWithRetry(
+    'get_supply',
+    {},
+    retryDelayMs,
+    maxRetries,
+  );
+
+  const { delegated, slotsRemaining } = parseWalletStatus(walletStatus);
+
+  if (!delegated) {
+    throw new Error(
+      `Wallet ${address} not delegated yet.\n${walletStatus}`,
+    );
+  }
+
+  if (slotsRemaining !== null && count > slotsRemaining) {
+    throw new Error(
+      `Requested ${count} slot(s), but only ${slotsRemaining} slot(s) remain for ${address}.`,
+    );
+  }
+
+  const result = await callToolWithRetry(
+    count === 1 ? 'mint' : 'batch_mint',
+    count === 1 ? { address } : { address, count },
+    retryDelayMs,
+    maxRetries,
+  );
 
   console.log(`MCP endpoint: ${process.env.MCP_URL ?? DEFAULT_MCP_URL}`);
   console.log(`Address: ${address}`);
