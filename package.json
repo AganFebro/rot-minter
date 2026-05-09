@@ -1,0 +1,12 @@
+{
+  "name": "viem-delegate-script",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "delegate": "node delegate-votes.mjs",
+    "mint": "node mint-rot.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.38.6"
+  }
+}
