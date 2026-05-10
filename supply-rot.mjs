@@ -1,56 +1,12 @@
 import 'dotenv/config';
-import { privateKeyToAccount } from 'viem/accounts';
 
 const DEFAULT_MCP_URL = 'https://www.brainrot.dog/api/mcp';
-const RELAYER_NOT_CONFIGURED_ERROR = 'error: RELAYER_SERVER_URL not configured';
 const FETCH_FAILED_ERROR = 'fetch failed';
 const RETRYABLE_STATUS_ERRORS = [
   'MCP request failed with status 502',
   'MCP request failed with status 503',
   'MCP request failed with status 504',
 ];
-
-function readRequiredEnv(name) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required env: ${name}`);
-  }
-
-  return value;
-}
-
-function readMintAddress() {
-  if (process.env.MINT_ADDRESS) {
-    return process.env.MINT_ADDRESS;
-  }
-
-  const ownerPrivateKey =
-    process.env.OWNER_PRIVATE_KEY ?? process.env.PRIVATE_KEY;
-
-  if (!ownerPrivateKey) {
-    throw new Error(
-      'Missing MINT_ADDRESS. Set MINT_ADDRESS or OWNER_PRIVATE_KEY/PRIVATE_KEY.',
-    );
-  }
-
-  if (!ownerPrivateKey.startsWith('0x')) {
-    throw new Error('OWNER_PRIVATE_KEY/PRIVATE_KEY must start with 0x');
-  }
-
-  return privateKeyToAccount(ownerPrivateKey).address;
-}
-
-function readCount() {
-  const rawCount = process.env.MINT_COUNT ?? '1';
-  const count = Number(rawCount);
-
-  if (!Number.isInteger(count) || count < 1 || count > 10) {
-    throw new Error('MINT_COUNT must be an integer in range 1-10');
-  }
-
-  return count;
-}
 
 function readRetryDelayMs() {
   const rawDelay = process.env.RETRY_DELAY_MS ?? '15000';
@@ -132,22 +88,11 @@ async function callMcp(method, params) {
   return payload.result;
 }
 
-function parseWalletStatus(text) {
-  const delegated = /delegated:\s*true/i.test(text);
-  const slotsRemainingMatch = text.match(/slots remaining:\s*(\d+)/i);
-  const slotsRemaining = slotsRemainingMatch
-    ? Number(slotsRemainingMatch[1])
-    : null;
-
-  return { delegated, slotsRemaining };
-}
-
 function shouldRetry(error) {
   return (
     error instanceof Error &&
     (
       error.message.includes(FETCH_FAILED_ERROR) ||
-      error.message.includes(RELAYER_NOT_CONFIGURED_ERROR) ||
       RETRYABLE_STATUS_ERRORS.some((message) => error.message.includes(message))
     )
   );
@@ -159,17 +104,23 @@ function sleep(ms) {
   });
 }
 
-async function callToolWithRetry(name, args, retryDelayMs, maxRetries) {
+async function main() {
+  const retryDelayMs = readRetryDelayMs();
+  const maxRetries = readMaxRetries();
   let attempt = 0;
 
   while (true) {
     try {
-      return unwrapToolResult(
+      const result = unwrapToolResult(
         await callMcp('tools/call', {
-          name,
-          arguments: args,
+          name: 'get_supply',
+          arguments: {},
         }),
       );
+
+      console.log(`MCP endpoint: ${process.env.MCP_URL ?? DEFAULT_MCP_URL}`);
+      console.log(result);
+      return;
     } catch (error) {
       if (!shouldRetry(error)) {
         throw error;
@@ -192,61 +143,9 @@ async function callToolWithRetry(name, args, retryDelayMs, maxRetries) {
   }
 }
 
-async function main() {
-  const address = readMintAddress();
-  const count = readCount();
-  const retryDelayMs = readRetryDelayMs();
-  const maxRetries = readMaxRetries();
-
-  const walletStatus = await callToolWithRetry(
-    'check_wallet',
-    { address },
-    retryDelayMs,
-    maxRetries,
-  );
-
-  const supplyStatus = await callToolWithRetry(
-    'get_supply',
-    {},
-    retryDelayMs,
-    maxRetries,
-  );
-
-  const { delegated, slotsRemaining } = parseWalletStatus(walletStatus);
-
-  if (!delegated) {
-    throw new Error(
-      `Wallet ${address} not delegated yet.\n${walletStatus}`,
-    );
-  }
-
-  if (slotsRemaining !== null && count > slotsRemaining) {
-    throw new Error(
-      `Requested ${count} slot(s), but only ${slotsRemaining} slot(s) remain for ${address}.`,
-    );
-  }
-
-  const result = await callToolWithRetry(
-    count === 1 ? 'mint' : 'batch_mint',
-    count === 1 ? { address } : { address, count },
-    retryDelayMs,
-    maxRetries,
-  );
-
-  console.log(`MCP endpoint: ${process.env.MCP_URL ?? DEFAULT_MCP_URL}`);
-  console.log(`Address: ${address}`);
-  console.log(`Count: ${count}`);
-  console.log('');
-  console.log(walletStatus);
-  console.log('');
-  console.log(supplyStatus);
-  console.log('');
-  console.log(result);
-}
-
 main().catch((error) => {
   console.error(
-    error instanceof Error ? error.message : 'Unknown MCP mint error',
+    error instanceof Error ? error.message : 'Unknown MCP supply error',
   );
   process.exit(1);
 });

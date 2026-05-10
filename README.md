@@ -4,8 +4,9 @@ Script kecil buat:
 
 1. **delegate EIP-7702** wallet ke `FeedDelegate`
 2. **mint `$ROT`** lewat MCP `brainrot.dog`
+3. **cek supply `$ROT`** lewat MCP `brainrot.dog`
 
-Project ini pakai **Node.js** + **viem**.
+Project ini pakai **Node.js**, **viem**, dan **dotenv**.
 
 ## 1. Install dulu
 
@@ -39,6 +40,8 @@ MAX_RETRIES=0
 RPC_URL=https://your-rpc-url
 PRIVATE_KEY=0xyourprivatekey
 ```
+
+Semua script otomatis baca `.env`, jadi tidak perlu `export` atau `for /f`.
 
 ## 3. Delegate wallet dulu
 
@@ -95,7 +98,22 @@ MINT_COUNT=5 npm run mint
 
 Maksimal `MINT_COUNT` adalah **10**.
 
-## 6. Cara kerja script mint
+## 6. Cek supply `$ROT`
+
+Kalau cuma mau lihat sisa slot mint global, jalankan:
+
+```bash
+npm run supply
+```
+
+Contoh output:
+
+```text
+MCP endpoint: https://www.brainrot.dog/api/mcp
+remaining mint slots: 15706 / 20000
+```
+
+## 7. Cara kerja script mint
 
 Script `mint-rot.mjs` tidak kirim tx langsung ke chain.
 
@@ -108,14 +126,20 @@ Script ini:
 
 Jadi gas mint bukan dibayar dari script ini. Mint dieksekusi oleh relayer milik server `brainrot.dog`.
 
-## 7. Kalau server MCP error
+## 8. Kalau server MCP error
 
-Kalau muncul `RELAYER_SERVER_URL not configured` atau status `502/503/504`, itu error dari server `brainrot.dog`, bukan dari wallet kamu.
+Kalau muncul `fetch failed`, `RELAYER_SERVER_URL not configured`, atau status `502/503/504`, itu error dari server/koneksi MCP, bukan dari wallet kamu.
 
 Script sudah dibuat untuk retry otomatis:
 
 - `RETRY_DELAY_MS=15000` → tunggu 15 detik
 - `MAX_RETRIES=0` → retry tanpa batas
+
+Kalau error koneksi `fetch failed`, script akan print:
+
+```text
+error fetch failed, retrying now
+```
 
 Kalau mau retry cuma 5 kali:
 
@@ -129,7 +153,9 @@ Kalau mau delay 30 detik:
 RETRY_DELAY_MS=30000 npm run mint
 ```
 
-## 8. Script yang tersedia
+Retry yang sama juga dipakai oleh `npm run supply`.
+
+## 9. Script yang tersedia
 
 ### `npm run delegate`
 
@@ -154,9 +180,17 @@ Atau:
 - `MCP_URL`
 - `OWNER_PRIVATE_KEY`
 
-## 9. Catatan penting
+### `npm run supply`
+
+Cek supply live `$ROT` dari MCP.
+
+Butuh minimal:
+
+- `MCP_URL`
+
+## 10. Catatan penting
 
 1. `delegate-votes.mjs` butuh RPC yang sudah support **EIP-7702 / Pectra**
 2. `mint-rot.mjs` butuh server MCP `brainrot.dog` dalam keadaan normal
-3. Kalau tool mint dari MCP error atau server timeout, script akan fail atau retry sesuai config
+3. `supply-rot.mjs` dan `mint-rot.mjs` sama-sama support retry untuk `fetch failed` dan `502/503/504`
 4. Jangan commit file `.env` karena isinya private key
